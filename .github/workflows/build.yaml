@@ -11,6 +11,10 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+
 env:
   REGISTRY: ghcr.io
 
@@ -124,8 +128,6 @@ jobs:
             BUILD_REF=${{ github.sha }}
             BUILD_REPOSITORY=${{ github.repository }}
             BUILD_VERSION=${{ needs.information.outputs.version }}
-          secrets: |
-            github_token=${{ secrets.SILO_REPO_TOKEN }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false

@@ -83,16 +83,9 @@ RUN apk add --no-cache \
     npm \
     bash
 
-# Clone the Silo application
-# GITHUB_TOKEN is passed as a build secret for private repo access
+# Clone the Silo application (public repo)
 WORKDIR /rails
-RUN --mount=type=secret,id=github_token \
-    if [ -f /run/secrets/github_token ]; then \
-      GITHUB_TOKEN=$(cat /run/secrets/github_token) && \
-      git clone --depth 1 --branch ${SILO_VERSION} https://${GITHUB_TOKEN}@github.com/kebabmane/silo-rss.git . ; \
-    else \
-      git clone --depth 1 --branch ${SILO_VERSION} https://github.com/kebabmane/silo-rss.git . ; \
-    fi && \
+RUN git clone --depth 1 --branch ${SILO_VERSION} https://github.com/kebabmane/silo-rss.git . && \
     rm -rf .git
 
 # Install gems
