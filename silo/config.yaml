@@ -70,5 +70,5 @@ backup_exclude:
 privileged: []
 host_network: false
 
-# Container image
-image: ghcr.io/kebabmane/silo-hass-addon/{arch}-silo
+# Container image (built by GitHub Actions)
+image: ghcr.io/kebabmane/silo/{arch}

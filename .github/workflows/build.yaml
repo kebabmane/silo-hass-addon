@@ -1,0 +1,187 @@
+name: Build and Publish
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  information:
+    name: Gather add-on information
+    runs-on: ubuntu-latest
+    outputs:
+      architectures: ${{ steps.info.outputs.architectures }}
+      build_date: ${{ steps.info.outputs.build_date }}
+      description: ${{ steps.info.outputs.description }}
+      name: ${{ steps.info.outputs.name }}
+      slug: ${{ steps.info.outputs.slug }}
+      target: ${{ steps.info.outputs.target }}
+      version: ${{ steps.info.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get add-on information
+        id: info
+        shell: bash
+        run: |
+          slug="silo"
+          target="${slug}"
+
+          # Read from config.yaml
+          version=$(yq e '.version' ${target}/config.yaml)
+          name=$(yq e '.name' ${target}/config.yaml)
+          description=$(yq e '.description' ${target}/config.yaml)
+          architectures=$(yq e -o=json '.arch' ${target}/config.yaml)
+
+          # Override version with tag if present
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            version="${{ github.ref_name }}"
+            version="${version#v}"
+          fi
+
+          echo "architectures=${architectures}" >> $GITHUB_OUTPUT
+          echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          echo "description=${description}" >> $GITHUB_OUTPUT
+          echo "name=${name}" >> $GITHUB_OUTPUT
+          echo "slug=${slug}" >> $GITHUB_OUTPUT
+          echo "target=${target}" >> $GITHUB_OUTPUT
+          echo "version=${version}" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build ${{ matrix.architecture }}
+    needs: information
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: ${{ fromJson(needs.information.outputs.architectures) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get build from
+        id: build_from
+        shell: bash
+        run: |
+          build_from=$(yq e ".build_from.${{ matrix.architecture }}" ${{ needs.information.outputs.target }}/build.yaml)
+          echo "image=${build_from}" >> $GITHUB_OUTPUT
+
+      - name: Set platform
+        id: platform
+        shell: bash
+        run: |
+          case "${{ matrix.architecture }}" in
+            aarch64) platform="linux/arm64" ;;
+            amd64) platform="linux/amd64" ;;
+            armhf) platform="linux/arm/v6" ;;
+            armv7) platform="linux/arm/v7" ;;
+            i386) platform="linux/386" ;;
+            *) platform="linux/amd64" ;;
+          esac
+          echo "platform=${platform}" >> $GITHUB_OUTPUT
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ needs.information.outputs.target }}
+          file: ${{ needs.information.outputs.target }}/Dockerfile
+          platforms: ${{ steps.platform.outputs.platform }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}/${{ matrix.architecture }}:${{ needs.information.outputs.version }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}/${{ matrix.architecture }}:latest
+          build-args: |
+            BUILD_FROM=${{ steps.build_from.outputs.image }}
+            BUILD_ARCH=${{ matrix.architecture }}
+            BUILD_DATE=${{ needs.information.outputs.build_date }}
+            BUILD_DESCRIPTION=${{ needs.information.outputs.description }}
+            BUILD_NAME=${{ needs.information.outputs.name }}
+            BUILD_REF=${{ github.sha }}
+            BUILD_REPOSITORY=${{ github.repository }}
+            BUILD_VERSION=${{ needs.information.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+  publish:
+    name: Publish
+    needs:
+      - information
+      - build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push manifest
+        shell: bash
+        run: |
+          architectures='${{ needs.information.outputs.architectures }}'
+          slug="${{ needs.information.outputs.slug }}"
+          version="${{ needs.information.outputs.version }}"
+          owner="${{ github.repository_owner }}"
+
+          # Build the list of architecture-specific images
+          images=""
+          for arch in $(echo "${architectures}" | jq -r '.[]'); do
+            images="${images} ${REGISTRY}/${owner}/${slug}/${arch}:${version}"
+          done
+
+          # Create and push the multi-arch manifest for version tag
+          docker manifest create \
+            "${REGISTRY}/${owner}/${slug}:${version}" \
+            ${images}
+          docker manifest push "${REGISTRY}/${owner}/${slug}:${version}"
+
+          # Create and push the multi-arch manifest for latest tag
+          images_latest=""
+          for arch in $(echo "${architectures}" | jq -r '.[]'); do
+            images_latest="${images_latest} ${REGISTRY}/${owner}/${slug}/${arch}:latest"
+          done
+
+          docker manifest create \
+            "${REGISTRY}/${owner}/${slug}:latest" \
+            ${images_latest}
+          docker manifest push "${REGISTRY}/${owner}/${slug}:latest"
+
+      - name: Update config.yaml with version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version="${{ needs.information.outputs.version }}"
+          yq e -i ".version = \"${version}\"" silo/config.yaml
+
+          # Update image reference
+          yq e -i ".image = \"ghcr.io/${{ github.repository_owner }}/silo\"" silo/config.yaml
