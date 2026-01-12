@@ -41,7 +41,8 @@ jobs:
           version=$(yq e '.version' ${target}/config.yaml)
           name=$(yq e '.name' ${target}/config.yaml)
           description=$(yq e '.description' ${target}/config.yaml)
-          architectures=$(yq e -o=json '.arch' ${target}/config.yaml)
+          # Get architectures as compact JSON array
+          architectures=$(yq e -o=json -I=0 '.arch' ${target}/config.yaml)
 
           # Override version with tag if present
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
