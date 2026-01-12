@@ -7,7 +7,7 @@ Silo is a self-hosted RSS/Atom feed reader with AI-powered daily briefs. It prov
 ## Features
 
 - Clean, distraction-free reading interface
-- AI-powered daily brief summaries (requires LiteLLM)
+- AI-powered daily brief summaries (configure in app settings)
 - Keyboard shortcuts for power users
 - OPML import/export for easy migration
 - Dark mode support
@@ -73,14 +73,6 @@ Control logging verbosity:
 - `error` - Only errors
 - `fatal` - Only fatal errors
 
-#### LiteLLM Settings (for AI Daily Briefs)
-
-To enable AI-powered daily brief summaries, configure:
-
-- **LiteLLM Base URL**: Your LiteLLM proxy URL (e.g., `http://homeassistant.local:4000`)
-- **LiteLLM API Key**: Your API key for authentication
-- **LiteLLM Model**: The model to use (e.g., `gpt-4`, `claude-3-sonnet`, `ollama/llama2`)
-
 ## Data Storage
 
 All data is persisted in Home Assistant's add-on data directory:
@@ -130,7 +122,7 @@ The add-on automatically runs database migrations on startup. If you see migrati
 
 ### Daily briefs not generating
 
-1. Verify LiteLLM settings are correct
+1. Configure LiteLLM settings in the app (Admin > Settings)
 2. Test your LiteLLM connection independently
 3. Check logs for API errors
 

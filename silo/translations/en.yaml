@@ -8,17 +8,3 @@ configuration:
     name: Log Level
     description: >-
       Logging verbosity level. Use 'debug' for troubleshooting, 'info' for normal operation.
-  litellm_base_url:
-    name: LiteLLM Base URL
-    description: >-
-      Optional. URL of your LiteLLM proxy server for AI-powered daily brief generation.
-      Example: http://homeassistant.local:4000
-  litellm_api_key:
-    name: LiteLLM API Key
-    description: >-
-      Optional. API key for authenticating with your LiteLLM proxy.
-  litellm_model:
-    name: LiteLLM Model
-    description: >-
-      Optional. The model name to use for daily brief generation.
-      Example: gpt-4, claude-3-sonnet, ollama/llama2

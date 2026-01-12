@@ -28,9 +28,6 @@ fi
 # Read configuration from Home Assistant options
 TIMEZONE=$(bashio::config 'timezone')
 LOG_LEVEL=$(bashio::config 'log_level')
-LITELLM_BASE_URL=$(bashio::config 'litellm_base_url')
-LITELLM_API_KEY=$(bashio::config 'litellm_api_key')
-LITELLM_MODEL=$(bashio::config 'litellm_model')
 
 # Auto-generate SECRET_KEY_BASE if not exists
 if [[ -f "${DATA_DIR}/.secret_key_base" ]]; then
@@ -94,19 +91,6 @@ echo "true" > "${ENV_DIR}/SOLID_QUEUE_IN_PUMA"
 echo "8099" > "${ENV_DIR}/PORT"
 echo "${INGRESS_ENTRY}" > "${ENV_DIR}/RAILS_RELATIVE_URL_ROOT"
 echo "*" > "${ENV_DIR}/ACTION_CABLE_ALLOWED_REQUEST_ORIGINS"
-
-# Set optional LiteLLM environment variables
-if [[ -n "${LITELLM_BASE_URL}" ]]; then
-    echo "${LITELLM_BASE_URL}" > "${ENV_DIR}/LITELLM_BASE_URL"
-fi
-
-if [[ -n "${LITELLM_API_KEY}" ]]; then
-    echo "${LITELLM_API_KEY}" > "${ENV_DIR}/LITELLM_API_KEY"
-fi
-
-if [[ -n "${LITELLM_MODEL}" ]]; then
-    echo "${LITELLM_MODEL}" > "${ENV_DIR}/LITELLM_MODEL"
-fi
 
 bashio::log.info "Environment configured."
 bashio::log.info "Running database migrations..."

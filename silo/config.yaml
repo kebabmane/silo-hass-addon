@@ -1,5 +1,5 @@
 name: Silo Feed Reader
-version: "1.1.0"
+version: "1.1.1"
 slug: silo
 description: Self-hosted RSS/Atom feed reader with AI-powered daily briefs
 url: https://github.com/kebabmane/silo-hass-addon/tree/main/silo
@@ -37,17 +37,11 @@ map:
 options:
   timezone: "UTC"
   log_level: "info"
-  litellm_base_url: ""
-  litellm_api_key: ""
-  litellm_model: ""
 
 # Schema validation
 schema:
   timezone: str
   log_level: list(debug|info|warn|error|fatal)
-  litellm_base_url: url?
-  litellm_api_key: str?
-  litellm_model: str?
 
 # Health check
 watchdog: http://[HOST]:[PORT:8099]/up
