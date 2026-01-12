@@ -49,7 +49,8 @@ RUN apk add --no-cache \
     nodejs \
     npm \
     git \
-    bash
+    bash \
+    openssl
 
 # Update bundler to specific version
 RUN gem install bundler -v ${BUNDLER_VERSION} --no-document
