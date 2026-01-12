@@ -1,0 +1,21 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Silo Feed Reader - Finish Script
+# ==============================================================================
+
+declare EXIT_CODE=${1:-0}
+declare SIGNAL=${2:-0}
+
+bashio::log.info "Silo service stopped. Exit code: ${EXIT_CODE}, Signal: ${SIGNAL}"
+
+if [[ "${EXIT_CODE}" -ne 0 ]] && [[ "${EXIT_CODE}" -ne 256 ]]; then
+    bashio::log.warning "Silo exited with unexpected code: ${EXIT_CODE}"
+
+    if [[ "${SIGNAL}" -eq 15 ]]; then
+        bashio::log.info "Received SIGTERM, allowing graceful shutdown"
+    else
+        bashio::log.warning "Service will restart in 5 seconds..."
+        sleep 5
+    fi
+fi

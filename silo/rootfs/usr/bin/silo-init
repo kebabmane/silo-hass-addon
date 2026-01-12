@@ -1,0 +1,128 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Silo Feed Reader - Initialization Script
+# ==============================================================================
+
+bashio::log.info "Initializing Silo Feed Reader..."
+
+# Create data directories in HA's persistent storage
+DATA_DIR="/data"
+STORAGE_DIR="${DATA_DIR}/storage"
+DB_DIR="${DATA_DIR}/db"
+
+mkdir -p "${STORAGE_DIR}"
+mkdir -p "${DB_DIR}"
+
+# Symlink Rails directories to persistent locations
+if [[ ! -L /rails/storage ]]; then
+    rm -rf /rails/storage 2>/dev/null || true
+    ln -sf "${STORAGE_DIR}" /rails/storage
+fi
+
+if [[ ! -L /rails/db ]]; then
+    rm -rf /rails/db 2>/dev/null || true
+    ln -sf "${DB_DIR}" /rails/db
+fi
+
+# Read configuration from Home Assistant options
+TIMEZONE=$(bashio::config 'timezone')
+LOG_LEVEL=$(bashio::config 'log_level')
+RAILS_MAX_THREADS=$(bashio::config 'rails_max_threads')
+SECRET_KEY_BASE=$(bashio::config 'secret_key_base')
+RAILS_MASTER_KEY=$(bashio::config 'rails_master_key')
+ADMIN_EMAIL=$(bashio::config 'admin_email')
+LITELLM_BASE_URL=$(bashio::config 'litellm_base_url')
+LITELLM_API_KEY=$(bashio::config 'litellm_api_key')
+LITELLM_MODEL=$(bashio::config 'litellm_model')
+
+# Generate SECRET_KEY_BASE if not provided
+if [[ -z "${SECRET_KEY_BASE}" ]]; then
+    if [[ -f "${DATA_DIR}/.secret_key_base" ]]; then
+        SECRET_KEY_BASE=$(cat "${DATA_DIR}/.secret_key_base")
+        bashio::log.info "Using existing SECRET_KEY_BASE"
+    else
+        bashio::log.info "Generating new SECRET_KEY_BASE..."
+        SECRET_KEY_BASE=$(openssl rand -hex 64)
+        echo "${SECRET_KEY_BASE}" > "${DATA_DIR}/.secret_key_base"
+        chmod 600 "${DATA_DIR}/.secret_key_base"
+    fi
+fi
+
+# Validate RAILS_MASTER_KEY is provided
+if [[ -z "${RAILS_MASTER_KEY}" ]]; then
+    bashio::log.error "=============================================="
+    bashio::log.error "RAILS_MASTER_KEY is required!"
+    bashio::log.error "Please set it in the addon configuration."
+    bashio::log.error ""
+    bashio::log.error "You can find it in your Rails app's"
+    bashio::log.error "config/master.key file, or generate one with:"
+    bashio::log.error "  rails credentials:edit"
+    bashio::log.error "=============================================="
+    exit 1
+fi
+
+# Get ingress path from Home Assistant
+INGRESS_ENTRY=$(bashio::addon.ingress_entry)
+bashio::log.info "Ingress entry path: ${INGRESS_ENTRY}"
+
+# Set up environment variables for the Rails application
+# Using s6-overlay environment directory
+ENV_DIR="/var/run/s6/container_environment"
+mkdir -p "${ENV_DIR}"
+
+echo "${TIMEZONE}" > "${ENV_DIR}/TZ"
+echo "production" > "${ENV_DIR}/RAILS_ENV"
+echo "${LOG_LEVEL}" > "${ENV_DIR}/RAILS_LOG_LEVEL"
+echo "${RAILS_MAX_THREADS}" > "${ENV_DIR}/RAILS_MAX_THREADS"
+echo "${SECRET_KEY_BASE}" > "${ENV_DIR}/SECRET_KEY_BASE"
+echo "${RAILS_MASTER_KEY}" > "${ENV_DIR}/RAILS_MASTER_KEY"
+echo "1" > "${ENV_DIR}/RAILS_SERVE_STATIC_FILES"
+echo "1" > "${ENV_DIR}/RAILS_LOG_TO_STDOUT"
+echo "true" > "${ENV_DIR}/DISABLE_SSL"
+echo "true" > "${ENV_DIR}/SOLID_QUEUE_IN_PUMA"
+echo "8099" > "${ENV_DIR}/PORT"
+echo "${INGRESS_ENTRY}" > "${ENV_DIR}/RAILS_RELATIVE_URL_ROOT"
+echo "*" > "${ENV_DIR}/ACTION_CABLE_ALLOWED_REQUEST_ORIGINS"
+
+# Set optional environment variables
+if [[ -n "${ADMIN_EMAIL}" ]]; then
+    echo "${ADMIN_EMAIL}" > "${ENV_DIR}/ADMIN_EMAIL"
+fi
+
+if [[ -n "${LITELLM_BASE_URL}" ]]; then
+    echo "${LITELLM_BASE_URL}" > "${ENV_DIR}/LITELLM_BASE_URL"
+fi
+
+if [[ -n "${LITELLM_API_KEY}" ]]; then
+    echo "${LITELLM_API_KEY}" > "${ENV_DIR}/LITELLM_API_KEY"
+fi
+
+if [[ -n "${LITELLM_MODEL}" ]]; then
+    echo "${LITELLM_MODEL}" > "${ENV_DIR}/LITELLM_MODEL"
+fi
+
+bashio::log.info "Environment configured."
+bashio::log.info "Running database migrations..."
+
+# Export environment for migrations
+export TZ="${TIMEZONE}"
+export RAILS_ENV="production"
+export RAILS_LOG_LEVEL="${LOG_LEVEL}"
+export RAILS_MAX_THREADS="${RAILS_MAX_THREADS}"
+export SECRET_KEY_BASE="${SECRET_KEY_BASE}"
+export RAILS_MASTER_KEY="${RAILS_MASTER_KEY}"
+export RAILS_SERVE_STATIC_FILES="1"
+export RAILS_LOG_TO_STDOUT="1"
+export DISABLE_SSL="true"
+export SOLID_QUEUE_IN_PUMA="true"
+export PORT="8099"
+export RAILS_RELATIVE_URL_ROOT="${INGRESS_ENTRY}"
+
+# Run database migrations
+cd /rails || exit 1
+./bin/rails db:prepare 2>&1 | while read -r line; do
+    bashio::log.info "${line}"
+done
+
+bashio::log.info "Silo initialization complete!"

@@ -1,0 +1,26 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Silo Feed Reader - Main Service
+# ==============================================================================
+
+bashio::log.info "Starting Silo Feed Reader..."
+
+cd /rails || exit 1
+
+# Load environment from init script
+if [[ -f /var/run/s6/container_environment/RAILS_ENV ]]; then
+    # S6 environment is set up
+    true
+fi
+
+# Enable jemalloc for reduced memory usage if available
+JEMALLOC=$(find /usr/lib -name "libjemalloc.so*" -print -quit 2>/dev/null || true)
+if [[ -n "${JEMALLOC}" ]]; then
+    export LD_PRELOAD="${JEMALLOC}"
+    bashio::log.info "Enabled jemalloc: ${JEMALLOC}"
+fi
+
+# Start Rails server with Solid Queue embedded
+# SOLID_QUEUE_IN_PUMA runs background jobs inside the Puma web server
+exec ./bin/rails server -b 0.0.0.0 -p 8099 2>&1
