@@ -2,7 +2,6 @@ ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
 # Build arguments
-ARG RUBY_VERSION=3.3.0
 ARG BUNDLER_VERSION=2.5.0
 ARG SILO_VERSION=main
 
@@ -18,57 +17,25 @@ ENV RAILS_ENV=production \
     PORT=8099 \
     LANG=C.UTF-8
 
-# Install build dependencies
-RUN apk add --no-cache --virtual .build-deps \
-    autoconf \
-    bison \
-    bzip2 \
-    bzip2-dev \
-    ca-certificates \
-    coreutils \
-    dpkg-dev \
-    dpkg \
+# Install Ruby and build dependencies from Alpine packages
+# Using Alpine's packaged Ruby for cross-platform compatibility
+RUN apk add --no-cache \
+    ruby \
+    ruby-dev \
+    ruby-bundler \
+    ruby-json \
+    ruby-bigdecimal \
+    ruby-etc \
+    build-base \
     gcc \
     g++ \
-    gdbm-dev \
-    glib-dev \
+    make \
     libc-dev \
     libffi-dev \
     libxml2-dev \
     libxslt-dev \
-    linux-headers \
-    make \
-    ncurses-dev \
-    openssl-dev \
-    patch \
-    procps \
-    readline-dev \
-    ruby \
-    tar \
-    xz \
     yaml-dev \
     zlib-dev \
-    git
-
-# Install Ruby from source
-RUN cd /tmp && \
-    wget -O ruby.tar.xz "https://cache.ruby-lang.org/pub/ruby/${RUBY_VERSION%.*}/ruby-${RUBY_VERSION}.tar.xz" && \
-    mkdir -p /usr/src/ruby && \
-    tar -xJf ruby.tar.xz -C /usr/src/ruby --strip-components=1 && \
-    rm ruby.tar.xz && \
-    cd /usr/src/ruby && \
-    ./configure \
-        --disable-install-doc \
-        --enable-shared && \
-    make -j "$(nproc)" && \
-    make install && \
-    rm -rf /usr/src/ruby /tmp/*
-
-# Install bundler
-RUN gem install bundler -v ${BUNDLER_VERSION} --no-document
-
-# Install runtime dependencies
-RUN apk add --no-cache \
     sqlite \
     sqlite-dev \
     libxml2 \
@@ -81,7 +48,11 @@ RUN apk add --no-cache \
     vips-dev \
     nodejs \
     npm \
+    git \
     bash
+
+# Update bundler to specific version
+RUN gem install bundler -v ${BUNDLER_VERSION} --no-document
 
 # Clone the Silo application (public repo)
 WORKDIR /rails
@@ -101,7 +72,7 @@ RUN bundle exec bootsnap precompile --gemfile app/ lib/ || true
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile || true
 
 # Cleanup build dependencies to reduce image size
-RUN apk del .build-deps && \
+RUN apk del build-base gcc g++ make ruby-dev libffi-dev libxml2-dev libxslt-dev yaml-dev zlib-dev sqlite-dev vips-dev git && \
     rm -rf /tmp/* /var/cache/apk/*
 
 # Copy rootfs overlay
