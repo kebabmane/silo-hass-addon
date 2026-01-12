@@ -14,6 +14,23 @@ if [[ -f /var/run/s6/container_environment/RAILS_ENV ]]; then
     true
 fi
 
+# Display admin credentials if they exist
+if [[ -f "/data/admin_credentials.json" ]]; then
+    admin_email=$(bashio::jq /data/admin_credentials.json '.email')
+    admin_password=$(bashio::jq /data/admin_credentials.json '.password')
+    created_at=$(bashio::jq /data/admin_credentials.json '.created_at')
+
+    bashio::log.info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    bashio::log.info "SILO ADMIN ACCESS"
+    bashio::log.info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    bashio::log.info "Email: ${admin_email}"
+    bashio::log.info "Password: ${admin_password}"
+    bashio::log.info "Created: ${created_at}"
+    bashio::log.info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    bashio::log.info "Change this password after first login!"
+    bashio::log.info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+fi
+
 # Enable jemalloc for reduced memory usage if available
 JEMALLOC=$(find /usr/lib -name "libjemalloc.so*" -print -quit 2>/dev/null || true)
 if [[ -n "${JEMALLOC}" ]]; then

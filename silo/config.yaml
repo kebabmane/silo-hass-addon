@@ -33,14 +33,10 @@ timeout: 300
 map:
   - addon_config:rw
 
-# User-configurable options
+# User-configurable options (Rails internals are auto-generated)
 options:
   timezone: "UTC"
   log_level: "info"
-  rails_max_threads: 5
-  secret_key_base: ""
-  rails_master_key: ""
-  admin_email: ""
   litellm_base_url: ""
   litellm_api_key: ""
   litellm_model: ""
@@ -49,10 +45,6 @@ options:
 schema:
   timezone: str
   log_level: list(debug|info|warn|error|fatal)
-  rails_max_threads: int(1,20)
-  secret_key_base: str?
-  rails_master_key: password
-  admin_email: email?
   litellm_base_url: url?
   litellm_api_key: str?
   litellm_model: str?

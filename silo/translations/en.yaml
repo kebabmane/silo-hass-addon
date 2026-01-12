@@ -8,26 +8,6 @@ configuration:
     name: Log Level
     description: >-
       Logging verbosity level. Use 'debug' for troubleshooting, 'info' for normal operation.
-  rails_max_threads:
-    name: Max Threads
-    description: >-
-      Maximum number of threads for the web server. Higher values handle more concurrent
-      requests but use more memory. Default of 5 is suitable for most home use.
-  secret_key_base:
-    name: Secret Key Base
-    description: >-
-      Leave empty to auto-generate (recommended). Only set this if you are migrating
-      from an existing Silo installation and need to preserve encrypted data.
-  rails_master_key:
-    name: Rails Master Key
-    description: >-
-      Required. This key decrypts Rails credentials. For a fresh install, you'll need
-      to generate one. For existing installations, copy from config/master.key.
-  admin_email:
-    name: Admin Email
-    description: >-
-      Optional. Email address for the initial admin account. If not set, you'll need
-      to register through the web interface.
   litellm_base_url:
     name: LiteLLM Base URL
     description: >-

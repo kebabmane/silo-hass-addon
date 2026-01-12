@@ -28,38 +28,48 @@ fi
 # Read configuration from Home Assistant options
 TIMEZONE=$(bashio::config 'timezone')
 LOG_LEVEL=$(bashio::config 'log_level')
-RAILS_MAX_THREADS=$(bashio::config 'rails_max_threads')
-SECRET_KEY_BASE=$(bashio::config 'secret_key_base')
-RAILS_MASTER_KEY=$(bashio::config 'rails_master_key')
-ADMIN_EMAIL=$(bashio::config 'admin_email')
 LITELLM_BASE_URL=$(bashio::config 'litellm_base_url')
 LITELLM_API_KEY=$(bashio::config 'litellm_api_key')
 LITELLM_MODEL=$(bashio::config 'litellm_model')
 
-# Generate SECRET_KEY_BASE if not provided
-if [[ -z "${SECRET_KEY_BASE}" ]]; then
-    if [[ -f "${DATA_DIR}/.secret_key_base" ]]; then
-        SECRET_KEY_BASE=$(cat "${DATA_DIR}/.secret_key_base")
-        bashio::log.info "Using existing SECRET_KEY_BASE"
-    else
-        bashio::log.info "Generating new SECRET_KEY_BASE..."
-        SECRET_KEY_BASE=$(openssl rand -hex 64)
-        echo "${SECRET_KEY_BASE}" > "${DATA_DIR}/.secret_key_base"
-        chmod 600 "${DATA_DIR}/.secret_key_base"
-    fi
+# Auto-generate SECRET_KEY_BASE if not exists
+if [[ -f "${DATA_DIR}/.secret_key_base" ]]; then
+    SECRET_KEY_BASE=$(cat "${DATA_DIR}/.secret_key_base")
+    bashio::log.info "Using existing SECRET_KEY_BASE"
+else
+    bashio::log.info "Generating new SECRET_KEY_BASE..."
+    SECRET_KEY_BASE=$(openssl rand -hex 64)
+    echo "${SECRET_KEY_BASE}" > "${DATA_DIR}/.secret_key_base"
+    chmod 600 "${DATA_DIR}/.secret_key_base"
 fi
 
-# Validate RAILS_MASTER_KEY is provided
-if [[ -z "${RAILS_MASTER_KEY}" ]]; then
-    bashio::log.error "=============================================="
-    bashio::log.error "RAILS_MASTER_KEY is required!"
-    bashio::log.error "Please set it in the addon configuration."
-    bashio::log.error ""
-    bashio::log.error "You can find it in your Rails app's"
-    bashio::log.error "config/master.key file, or generate one with:"
-    bashio::log.error "  rails credentials:edit"
-    bashio::log.error "=============================================="
-    exit 1
+# Auto-generate RAILS_MASTER_KEY if not exists
+if [[ -f "${DATA_DIR}/.rails_master_key" ]]; then
+    RAILS_MASTER_KEY=$(cat "${DATA_DIR}/.rails_master_key")
+    bashio::log.info "Using existing RAILS_MASTER_KEY"
+else
+    bashio::log.info "Generating new RAILS_MASTER_KEY..."
+    RAILS_MASTER_KEY=$(openssl rand -hex 16)
+    echo "${RAILS_MASTER_KEY}" > "${DATA_DIR}/.rails_master_key"
+    chmod 600 "${DATA_DIR}/.rails_master_key"
+fi
+
+# Generate admin credentials on first run
+SILO_ADMIN_EMAIL=""
+SILO_ADMIN_PASSWORD=""
+if [[ ! -f "${DATA_DIR}/admin_credentials.json" ]]; then
+    bashio::log.info "Generating admin credentials for first run..."
+    SILO_ADMIN_PASSWORD=$(openssl rand -base64 12)
+    SILO_ADMIN_EMAIL="admin@silo.local"
+    cat > "${DATA_DIR}/admin_credentials.json" <<EOF
+{
+  "email": "${SILO_ADMIN_EMAIL}",
+  "password": "${SILO_ADMIN_PASSWORD}",
+  "created_at": "$(date -Iseconds)"
+}
+EOF
+    chmod 600 "${DATA_DIR}/admin_credentials.json"
+    bashio::log.info "Admin credentials generated and saved"
 fi
 
 # Get ingress path from Home Assistant
@@ -74,7 +84,7 @@ mkdir -p "${ENV_DIR}"
 echo "${TIMEZONE}" > "${ENV_DIR}/TZ"
 echo "production" > "${ENV_DIR}/RAILS_ENV"
 echo "${LOG_LEVEL}" > "${ENV_DIR}/RAILS_LOG_LEVEL"
-echo "${RAILS_MAX_THREADS}" > "${ENV_DIR}/RAILS_MAX_THREADS"
+echo "5" > "${ENV_DIR}/RAILS_MAX_THREADS"
 echo "${SECRET_KEY_BASE}" > "${ENV_DIR}/SECRET_KEY_BASE"
 echo "${RAILS_MASTER_KEY}" > "${ENV_DIR}/RAILS_MASTER_KEY"
 echo "1" > "${ENV_DIR}/RAILS_SERVE_STATIC_FILES"
@@ -85,11 +95,7 @@ echo "8099" > "${ENV_DIR}/PORT"
 echo "${INGRESS_ENTRY}" > "${ENV_DIR}/RAILS_RELATIVE_URL_ROOT"
 echo "*" > "${ENV_DIR}/ACTION_CABLE_ALLOWED_REQUEST_ORIGINS"
 
-# Set optional environment variables
-if [[ -n "${ADMIN_EMAIL}" ]]; then
-    echo "${ADMIN_EMAIL}" > "${ENV_DIR}/ADMIN_EMAIL"
-fi
-
+# Set optional LiteLLM environment variables
 if [[ -n "${LITELLM_BASE_URL}" ]]; then
     echo "${LITELLM_BASE_URL}" > "${ENV_DIR}/LITELLM_BASE_URL"
 fi
@@ -109,7 +115,7 @@ bashio::log.info "Running database migrations..."
 export TZ="${TIMEZONE}"
 export RAILS_ENV="production"
 export RAILS_LOG_LEVEL="${LOG_LEVEL}"
-export RAILS_MAX_THREADS="${RAILS_MAX_THREADS}"
+export RAILS_MAX_THREADS="5"
 export SECRET_KEY_BASE="${SECRET_KEY_BASE}"
 export RAILS_MASTER_KEY="${RAILS_MASTER_KEY}"
 export RAILS_SERVE_STATIC_FILES="1"
@@ -124,5 +130,15 @@ cd /rails || exit 1
 ./bin/rails db:prepare 2>&1 | while read -r line; do
     bashio::log.info "${line}"
 done
+
+# Run seeds to create admin user if credentials were just generated
+if [[ -n "${SILO_ADMIN_EMAIL}" ]] && [[ -n "${SILO_ADMIN_PASSWORD}" ]]; then
+    bashio::log.info "Creating admin user..."
+    export SILO_ADMIN_EMAIL="${SILO_ADMIN_EMAIL}"
+    export SILO_ADMIN_PASSWORD="${SILO_ADMIN_PASSWORD}"
+    ./bin/rails db:seed 2>&1 | while read -r line; do
+        bashio::log.info "${line}"
+    done
+fi
 
 bashio::log.info "Silo initialization complete!"

@@ -13,30 +13,46 @@ Silo is a self-hosted RSS/Atom feed reader with AI-powered daily briefs. It prov
 - Dark mode support
 - Mobile-friendly progressive web app (PWA)
 - Full-text search across all articles
+- **Zero configuration required** - admin credentials auto-generated
 
 ## Installation
 
 1. Add this repository to your Home Assistant Add-on Store
 2. Install the Silo add-on
-3. Configure the required settings (see below)
-4. Start the add-on
+3. Start the add-on
+4. Check the logs for your admin credentials
 5. Access Silo via the sidebar
+
+## First-Time Setup
+
+On first startup, Silo automatically:
+
+1. Generates all required security keys
+2. Creates an admin user with a random password
+3. Displays the credentials in the add-on logs
+
+**Finding Your Admin Credentials:**
+
+1. Go to **Settings > Add-ons > Silo > Logs**
+2. Look for the "SILO ADMIN ACCESS" section
+3. Note the email and password
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SILO ADMIN ACCESS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Email: admin@silo.local
+Password: [your-generated-password]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Change this password after first login!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+4. Click "Silo" in the sidebar and log in
 
 ## Configuration
 
-### Required Settings
-
-#### Rails Master Key
-
-This is required to decrypt Rails credentials and must be set before the add-on will start.
-
-**For a fresh installation:**
-
-You have two options:
-
-1. **Use the default key** (easiest): The add-on includes a default master key for fresh installations. Simply leave the field empty and a new key will be generated.
-
-2. **Generate your own**: If you're running Silo elsewhere and want to migrate, copy the contents of `config/master.key` from your existing installation.
+All internal settings (security keys, database, etc.) are automatically managed. You only need to configure optional user preferences.
 
 ### Optional Settings
 
@@ -57,14 +73,6 @@ Control logging verbosity:
 - `error` - Only errors
 - `fatal` - Only fatal errors
 
-#### Max Threads
-
-Number of web server threads. The default of 5 is suitable for personal use. Increase if you experience slow responses with multiple users.
-
-#### Admin Email
-
-Pre-configure an admin account email. If not set, you'll register through the web interface on first access.
-
 #### LiteLLM Settings (for AI Daily Briefs)
 
 To enable AI-powered daily brief summaries, configure:
@@ -79,14 +87,9 @@ All data is persisted in Home Assistant's add-on data directory:
 
 - **Database files**: `/data/db/` - SQLite databases for feeds, articles, and settings
 - **File uploads**: `/data/storage/` - Any uploaded files or cached content
+- **Credentials**: `/data/admin_credentials.json` - Auto-generated admin password
 
 This data is automatically included in Home Assistant backups.
-
-## First-Time Setup
-
-1. After starting the add-on, click "Silo" in the sidebar
-2. Register a new account (or use the admin email if configured)
-3. Start adding feeds via the onboarding wizard or manually
 
 ## Keyboard Shortcuts
 
@@ -104,9 +107,18 @@ This data is automatically included in Home Assistant backups.
 
 ### Add-on won't start
 
-1. Check that `rails_master_key` is set correctly
-2. View the add-on logs for specific error messages
-3. Ensure you have enough disk space for the database
+1. View the add-on logs for specific error messages
+2. Ensure you have enough disk space for the database
+3. Try restarting the add-on
+
+### Forgot admin password
+
+The password is displayed in the logs every time the add-on starts. Check **Settings > Add-ons > Silo > Logs**.
+
+To reset credentials completely:
+1. Stop the add-on
+2. Delete `/data/admin_credentials.json` via SSH/terminal
+3. Start the add-on - a new password will be generated
 
 ### Database errors
 
@@ -115,12 +127,6 @@ The add-on automatically runs database migrations on startup. If you see migrati
 1. Check the logs for specific error messages
 2. Try restarting the add-on
 3. If problems persist, you may need to reset the database (backup first!)
-
-### Slow performance
-
-1. Increase `rails_max_threads` if you have available memory
-2. Consider reducing the number of feeds or enabling less frequent refresh intervals
-3. Check system resources in Home Assistant
 
 ### Daily briefs not generating
 
