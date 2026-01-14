@@ -111,7 +111,7 @@ export RAILS_RELATIVE_URL_ROOT="${INGRESS_ENTRY}"
 
 # Run database migrations
 cd /rails || exit 1
-./bin/rails db:prepare 2>&1 | while read -r line; do
+./bin/rails db:setup 2>&1 | while read -r line; do
     bashio::log.info "${line}"
 done
 

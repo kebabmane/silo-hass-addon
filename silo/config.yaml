@@ -1,5 +1,5 @@
 name: Silo Feed Reader
-version: "1.1.4"
+version: "1.1.5"
 slug: silo
 description: Self-hosted RSS/Atom feed reader with AI-powered daily briefs
 url: https://github.com/kebabmane/silo-hass-addon/tree/main/silo
