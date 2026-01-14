@@ -9,20 +9,14 @@ bashio::log.info "Initializing Silo Feed Reader..."
 # Create data directories in HA's persistent storage
 DATA_DIR="/data"
 STORAGE_DIR="${DATA_DIR}/storage"
-DB_DIR="${DATA_DIR}/db"
 
 mkdir -p "${STORAGE_DIR}"
-mkdir -p "${DB_DIR}"
 
-# Symlink Rails directories to persistent locations
+# Symlink Rails storage to persistent location (for SQLite databases)
+# Note: /rails/db contains code (migrations, schema.rb) - do NOT symlink it
 if [[ ! -L /rails/storage ]]; then
     rm -rf /rails/storage 2>/dev/null || true
     ln -sf "${STORAGE_DIR}" /rails/storage
-fi
-
-if [[ ! -L /rails/db ]]; then
-    rm -rf /rails/db 2>/dev/null || true
-    ln -sf "${DB_DIR}" /rails/db
 fi
 
 # Read configuration from Home Assistant options
@@ -111,7 +105,7 @@ export RAILS_RELATIVE_URL_ROOT="${INGRESS_ENTRY}"
 
 # Run database migrations
 cd /rails || exit 1
-./bin/rails db:setup 2>&1 | while read -r line; do
+./bin/rails db:prepare 2>&1 | while read -r line; do
     bashio::log.info "${line}"
 done
 
