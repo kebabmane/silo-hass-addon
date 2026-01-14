@@ -58,7 +58,8 @@ RUN gem install bundler -v ${BUNDLER_VERSION} --no-document
 # Clone the Silo application (public repo)
 WORKDIR /rails
 RUN git clone --depth 1 --branch ${SILO_VERSION} https://github.com/kebabmane/silo-rss.git . && \
-    rm -rf .git
+    rm -rf .git && \
+    rm -f config/credentials.yml.enc config/master.key
 
 # Install gems
 RUN bundle config set --local deployment true && \
